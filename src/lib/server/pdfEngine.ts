@@ -50,6 +50,37 @@ export class PdfEngine {
             },
         });
     }
+    // ... existing methods (upload, compress, download) ...
+
+    /**
+     * UNLOCK LOGIC
+     * Removes encryption/password from a PDF.
+     */
+    async unlock(key: string, password: string): Promise<string> {
+        // 1. Read from R2
+        const object = await this.bucket.get(key);
+        if (!object) throw new Error("File not found");
+
+        const arrayBuffer = await object.arrayBuffer();
+
+        // 2. Load with password
+        const pdfDoc = await PDFDocument.load(arrayBuffer, {
+            password: password,
+            ignoreEncryption: false
+        } as any); // 'as any' used here to bypass strict typing if needed in pdf-lib
+
+        // 3. Save without encryption
+        const pdfBytes = await pdfDoc.save();
+
+        // 4. Write result to R2
+        const resultKey = `results/${crypto.randomUUID()}-unlocked.pdf`;
+        await this.bucket.put(resultKey, pdfBytes);
+
+        // 5. Clean up original
+        await this.bucket.delete(key);
+
+        return resultKey;
+    }
 }
 
 // Define the interface locally to ensure type safety without external dependencies
@@ -70,3 +101,4 @@ export async function getPdfEngine(): Promise<PdfEngine> {
 
     return new PdfEngine(typedEnv.BUCKET);
 }
+

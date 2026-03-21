@@ -7,8 +7,15 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { allTools } from "@/lib/toolsConfig";
 import Link from "next/link";
 import { useToast } from "@/context/ToastContext";
-import { unlockPdf } from "@/lib/tools/unlock";
 import { downloadBlob } from "@/lib/utils";
+
+// Types for API responses
+interface UploadResponse {
+    key: string;
+}
+interface ProcessResponse {
+    resultKey: string;
+}
 
 export default function UnlockPdfPage() {
     const { files, addFiles, clearFiles } = useFiles();
@@ -29,24 +36,61 @@ export default function UnlockPdfPage() {
         }
 
         setIsProcessing(true);
-        showToast("Attempting to unlock...", "info");
+        showToast("Uploading file...", "info");
 
         try {
-            const resultBlob = await unlockPdf(files[0].file, password);
-            downloadBlob(resultBlob, `${files[0].file.name.replace('.pdf', '')}_unlocked.pdf`);
+            // --- STEP 1: UPLOAD ---
+            const uploadForm = new FormData();
+            uploadForm.append('file', files[0].file);
+
+            const uploadRes = await fetch('/api/upload', {
+                method: 'POST',
+                body: uploadForm,
+            });
+
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            const { key } = await uploadRes.json() as UploadResponse;
+
+            // --- STEP 2: PROCESS (UNLOCK) ---
+            showToast("Attempting to unlock...", "info");
+
+            const processRes = await fetch('/api/unlock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, password }),
+            });
+
+            // Handle specific error codes
+            if (processRes.status === 401) {
+                throw new Error("Incorrect password. Please try again.");
+            }
+            if (!processRes.ok) throw new Error("Failed to unlock PDF");
+
+            const { resultKey } = await processRes.json() as ProcessResponse;
+
+            // --- STEP 3: DOWNLOAD ---
+            showToast("Preparing download...", "info");
+
+            const downloadRes = await fetch('/api/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: resultKey }),
+            });
+
+            if (!downloadRes.ok) throw new Error("Download failed");
+
+            const blob = await downloadRes.blob();
+            downloadBlob(blob, `${files[0].file.name.replace('.pdf', '')}_unlocked.pdf`);
             showToast("Success! PDF Unlocked.", "success");
+
         } catch (error) {
             console.error(error);
-            // pdf-lib throws a specific error message for invalid passwords
-            const message = error instanceof Error && error.message.includes('password')
-                ? "Incorrect password. Please try again."
-                : "Failed to unlock PDF. It might be corrupted.";
+            const message = (error as Error).message || "Failed to unlock PDF. It might be corrupted.";
             showToast(message, "error");
         } finally {
             setIsProcessing(false);
         }
     };
-
     // Related Tools
     const relatedTools = allTools.filter(t => ['protect', 'edit', 'sign', 'watermark'].includes(t.id));
 

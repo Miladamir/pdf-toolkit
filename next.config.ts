@@ -1,16 +1,9 @@
-/** @type {import('next').NextConfig} */
+// next.config.ts
 const nextConfig = {
-  output: "export", // Remove this if you are moving to server-side
-  // For OpenNext, we actually usually don't need 'export' anymore, 
-  // but let's ensure the config is clean.
-  // If you were using 'export', REMOVE it for server features.
-
-  // Optional: configure images if needed
+  // output: "export",   ← comment out or delete this line
   images: {
-    remotePatterns: [
-      { hostname: '*' } // Adjust for your needs
-    ]
-  }
+    remotePatterns: [{ hostname: '*' }],
+  },
 };
 
 export default nextConfig;
