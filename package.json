@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "preview": "wrangler pages dev .worker-next --compatibility-flag=nodejs_compat --r2 PDF_BUCKET=pdf-toolkit-bucket",
-    "deploy": "opennextjs-cloudflare && wrangler pages deploy",
+    "preview": "next start",
+    "deploy": "next build && wrangler deploy",
     "start": "next start",
     "lint": "eslint"
   },
