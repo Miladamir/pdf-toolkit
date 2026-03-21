@@ -1,9 +1,17 @@
+// src/app/api/compress/route.ts
 import { NextRequest } from 'next/server';
 import { getPdfEngine } from '@/lib/server/pdfEngine';
 
+// Define the expected input shape
+interface CompressRequest {
+    key: string;
+    quality?: 'low' | 'recommended' | 'extreme';
+}
+
 export async function POST(req: NextRequest) {
     try {
-        const { key } = await req.json();
+        // Cast the JSON result to our interface
+        const { key } = await req.json() as CompressRequest;
 
         if (!key) {
             return new Response('Missing file key', { status: 400 });

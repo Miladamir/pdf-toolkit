@@ -9,6 +9,14 @@ import Link from "next/link";
 import { useToast } from "@/context/ToastContext";
 import { downloadBlob } from "@/lib/utils";
 
+// Define types for API responses
+interface UploadResponse {
+    key: string;
+}
+interface CompressResponse {
+    resultKey: string;
+}
+
 export default function CompressPdfPage() {
     const { files, addFiles, clearFiles } = useFiles();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -30,7 +38,6 @@ export default function CompressPdfPage() {
             setPreviewUrl(null);
             setProgress(0);
 
-            // Generate a quick preview of the first page (optional visual)
             const generatePreview = async () => {
                 const { renderPageToUrl } = await import('@/lib/pdf');
                 const url = await renderPageToUrl(files[0].file, 1);
@@ -58,7 +65,9 @@ export default function CompressPdfPage() {
             });
 
             if (!uploadRes.ok) throw new Error("Upload failed");
-            const { key } = await uploadRes.json();
+
+            // FIX: Cast JSON response
+            const { key } = await uploadRes.json() as UploadResponse;
 
             // --- STEP 2: PROCESS (COMPRESS) ---
             setProgress(50);
@@ -67,11 +76,13 @@ export default function CompressPdfPage() {
             const processRes = await fetch('/api/compress', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key, quality }), // Sending quality setting too
+                body: JSON.stringify({ key, quality }),
             });
 
             if (!processRes.ok) throw new Error("Compression failed");
-            const { resultKey } = await processRes.json();
+
+            // FIX: Cast JSON response
+            const { resultKey } = await processRes.json() as CompressResponse;
 
             // --- STEP 3: DOWNLOAD ---
             setProgress(90);
@@ -87,12 +98,12 @@ export default function CompressPdfPage() {
 
             const blob = await downloadRes.blob();
 
-            // Update UI with stats
+            // Update UI
             setCompressed(blob.size);
             setProgress(100);
             showToast("Success! Download started.", "success");
 
-            // Trigger Browser Download
+            // Trigger Download
             downloadBlob(blob, `${files[0].file.name.replace('.pdf', '')}_compressed.pdf`);
 
         } catch (error) {
@@ -102,7 +113,6 @@ export default function CompressPdfPage() {
             setIsProcessing(false);
         }
     };
-
     // Helpers
     const formatBytes = (bytes: number) => {
         if (bytes === 0) return '0 Bytes';

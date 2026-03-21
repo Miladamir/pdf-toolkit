@@ -1,5 +1,17 @@
+// src/lib/useServerTool.ts
 import { useState } from 'react';
 import { useToast } from '@/context/ToastContext';
+
+// Define response shapes
+interface UploadResponse {
+    success: boolean;
+    key: string;
+}
+
+interface ProcessResponse {
+    success: boolean;
+    resultKey: string;
+}
 
 export const useServerTool = () => {
     const [isProcessing, setIsProcessing] = useState(false);
@@ -7,7 +19,7 @@ export const useServerTool = () => {
 
     const processFile = async (
         file: File,
-        apiEndpoint: string // e.g. '/api/compress'
+        apiEndpoint: string
     ) => {
         setIsProcessing(true);
         try {
@@ -21,26 +33,28 @@ export const useServerTool = () => {
                 body: uploadForm,
             });
 
-            const { key } = await uploadRes.json();
-            if (!key) throw new Error("Upload failed");
+            // Cast response
+            const uploadData = await uploadRes.json() as UploadResponse;
+            if (!uploadData.key) throw new Error("Upload failed");
 
-            // Step 2: Process (Server-Side)
+            // Step 2: Process
             showToast("Processing on secure server...", "info");
             const processRes = await fetch(apiEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key }),
+                body: JSON.stringify({ key: uploadData.key }),
             });
 
-            const { resultKey } = await processRes.json();
-            if (!resultKey) throw new Error("Processing failed");
+            // Cast response
+            const processData = await processRes.json() as ProcessResponse;
+            if (!processData.resultKey) throw new Error("Processing failed");
 
             // Step 3: Download
             showToast("Preparing download...", "success");
             const downloadRes = await fetch('/api/download', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: resultKey }),
+                body: JSON.stringify({ key: processData.resultKey }),
             });
 
             // Trigger Browser Download
