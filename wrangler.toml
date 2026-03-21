@@ -1,5 +1,5 @@
 name = "pdf-toolkit"
-compatibility_date = "2026-01-01"   # ← update this
+compatibility_date = "2026-03-01"   # ← updated
 compatibility_flags = ["nodejs_compat"]
 
 main = ".worker-next/index.mjs"
@@ -8,6 +8,12 @@ main = ".worker-next/index.mjs"
 directory = ".worker-next/assets"
 binding = "ASSETS"
 
+# Your existing PDF storage binding
 [[r2_buckets]]
-binding = "BUCKET"
+binding = "BUCKET" 
+bucket_name = "pdf-toolkit-bucket"
+
+# ← ADD THIS NEW BLOCK (for Next.js caching)
+[[r2_buckets]]
+binding = "NEXT_INC_CACHE_R2_BUCKET"
 bucket_name = "pdf-toolkit-bucket"
