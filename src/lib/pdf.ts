@@ -141,7 +141,6 @@ export const renderPageToUrl = async (
 /**
  * Renders pages sequentially (page-by-page) to prevent memory spikes.
  * Accepts optional settings for scale, format, and quality.
- * Backward compatible with older components that don't pass the options object.
  */
 export const renderPagesInBatch = async (
     file: File,
@@ -154,7 +153,6 @@ export const renderPagesInBatch = async (
         onPageRendered?: (pageNum: number, url: string) => void;
     }
 ): Promise<Map<number, string>> => {
-    // Fallbacks for older files calling this without options
     const scale = options?.scale ?? 1.5;
     const format = options?.format ?? 'jpeg';
     const quality = options?.quality ?? 0.9;
@@ -164,11 +162,9 @@ export const renderPagesInBatch = async (
     const pdfjsLib = await import('pdfjs-dist');
     pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
 
-    // Load the document once
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-    // Process strictly page-by-page (like poppler) to avoid memory crashes
     for (let i = start; i <= end; i++) {
         try {
             const page = await pdf.getPage(i);
@@ -195,11 +191,8 @@ export const renderPagesInBatch = async (
                 if (onPageRendered) onPageRendered(i, url);
             }
 
-            // Cleanup canvas memory immediately to help garbage collector
             canvas.width = 0;
             canvas.height = 0;
-            
-            // Cleanup pdf.js page resources
             page.cleanup();
             
         } catch (e) {
@@ -207,8 +200,6 @@ export const renderPagesInBatch = async (
         }
     }
 
-    // Destroy the main pdf document object to free memory
     await pdf.destroy();
-    
     return results;
 };
