@@ -1,3 +1,4 @@
+
 import { PDFDocument } from 'pdf-lib';
 
 /**
@@ -142,56 +143,67 @@ export const renderPageToUrl = async (
 };
 
 /**
- * Renders a batch of pages in parallel for massive speed gains.
- * @param start 1-based start index
- * @param end 1-based end index
+ * Renders pages sequentially (page-by-page) to prevent memory spikes.
+ * Updates UI via callback as each page finishes.
  */
-export const renderPagesInBatch = async (
+export const renderPagesSequentially = async (
     file: File,
     start: number,
-    end: number
-): Promise<Map<number, string>> => {
-    const promises: Promise<void>[] = [];
-    const results = new Map<number, string>();
+    end: number,
+    options: {
+        scale: number;
+        format: 'jpeg' | 'png';
+        quality: number;
+        onPageRendered: (pageNum: number, url: string) => void;
+    }
+): Promise<void> => {
+    const { scale, format, quality, onPageRendered } = options;
 
     const pdfjsLib = await import('pdfjs-dist');
     pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
 
-    // Load the document once for the whole batch
+    // Load the document once
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
+    // Process strictly page-by-page (like poppler) to avoid memory crashes
     for (let i = start; i <= end; i++) {
-        const promise = async (pageNum: number) => {
-            try {
-                const page = await pdf.getPage(pageNum);
-                const viewport = page.getViewport({ scale: 0.8 }); // Fast scale
+        try {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale });
 
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                if (!context) return;
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            if (!context) continue;
 
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
 
-                await page.render({ canvasContext: context, viewport, canvas }).promise;
+            await page.render({ canvasContext: context, viewport, canvas }).promise;
 
-                const url = await new Promise<string | null>((resolve) => {
-                    canvas.toBlob((blob) => {
-                        if (blob) resolve(URL.createObjectURL(blob));
-                        else resolve(null);
-                    }, 'image/jpeg', 0.8);
-                });
+            const url = await new Promise<string | null>((resolve) => {
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(URL.createObjectURL(blob));
+                    else resolve(null);
+                }, `image/${format}`, format === 'jpeg' ? quality : undefined);
+            });
 
-                if (url) results.set(pageNum, url);
-            } catch (e) {
-                console.error(`Error rendering page ${pageNum}`, e);
+            if (url) {
+                onPageRendered(i, url);
             }
-        };
-        promises.push(promise(i));
+
+            // Cleanup canvas memory immediately to help garbage collector
+            canvas.width = 0;
+            canvas.height = 0;
+            
+            // Cleanup pdf.js page resources
+            page.cleanup();
+            
+        } catch (e) {
+            console.error(`Error rendering page ${i}`, e);
+        }
     }
 
-    // Wait for all pages in batch to finish simultaneously
-    await Promise.all(promises);
-    return results;
+    // Destroy the main pdf document object to free memory
+    await pdf.destroy();
 };
