@@ -19,7 +19,7 @@ export default function PdfToImagePage() {
     const [format, setFormat] = useState<'jpeg' | 'png'>('jpeg');
     const [quality, setQuality] = useState<'standard' | 'high' | 'ultra'>('high');
     const [pageCount, setPageCount] = useState(0);
-    const { showToast } = useToast("Failed to read PDF");
+    const { showToast } = useToast();
 
     // Map UI quality to pdf.js scale (1.0 scale = 72 DPI)
     const scaleMap = {
