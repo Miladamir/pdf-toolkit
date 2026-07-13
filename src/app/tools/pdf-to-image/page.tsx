@@ -7,7 +7,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { allTools } from "@/lib/toolsConfig";
 import Link from "next/link";
 import { useToast } from "@/context/ToastContext";
-import { getPdfPageCount, renderPagesSequentially } from "@/lib/pdf";
+import { getPdfPageCount, renderPagesInBatch } from "@/lib/pdf";
 import { downloadBlob } from "@/lib/utils";
 import JSZip from "jszip";
 
@@ -52,7 +52,7 @@ export default function PdfToImagePage() {
 
                     const urls = new Map<number, string>();
 
-                    await renderPagesSequentially(file, 1, count, {
+                    await renderPagesInBatch(file, 1, count, {
                         scale: scaleMap[quality],
                         format: format,
                         quality: 0.92, // 92% JPEG quality is visually lossless but keeps size down
