@@ -1,4 +1,3 @@
-
 import { PDFDocument } from 'pdf-lib';
 
 /**
@@ -48,7 +47,6 @@ export const downloadBlob = (blob: Blob, filename: string) => {
 
 /**
  * Renders a specific page of a PDF to an Image URL (Blob).
- * Uses dynamic import to avoid SSR issues in Next.js.
  */
 export const renderPageToImage = async (file: File, pageNum: number = 1, scale: number = 0.8): Promise<string | null> => {
     try {
@@ -117,9 +115,7 @@ export const renderPageToUrl = async (
     canvas.height = viewport.height;
     canvas.width = viewport.width;
 
-    // Apply CSS filter if requested
     if (filter === 'bw') {
-        // High contrast grayscale simulates B&W (Threshold effect)
         context.filter = 'grayscale(100%) contrast(1.5) brightness(1.1)';
     } else if (filter === 'grayscale') {
         context.filter = 'grayscale(100%)';
@@ -144,21 +140,27 @@ export const renderPageToUrl = async (
 
 /**
  * Renders pages sequentially (page-by-page) to prevent memory spikes.
- * Updates UI via callback as each page finishes.
+ * Accepts optional settings for scale, format, and quality.
+ * Backward compatible with older components that don't pass the options object.
  */
-export const renderPagesSequentially = async (
+export const renderPagesInBatch = async (
     file: File,
     start: number,
     end: number,
-    options: {
-        scale: number;
-        format: 'jpeg' | 'png';
-        quality: number;
-        onPageRendered: (pageNum: number, url: string) => void;
+    options?: {
+        scale?: number;
+        format?: 'jpeg' | 'png';
+        quality?: number;
+        onPageRendered?: (pageNum: number, url: string) => void;
     }
-): Promise<void> => {
-    const { scale, format, quality, onPageRendered } = options;
+): Promise<Map<number, string>> => {
+    // Fallbacks for older files calling this without options
+    const scale = options?.scale ?? 1.5;
+    const format = options?.format ?? 'jpeg';
+    const quality = options?.quality ?? 0.9;
+    const onPageRendered = options?.onPageRendered;
 
+    const results = new Map<number, string>();
     const pdfjsLib = await import('pdfjs-dist');
     pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
 
@@ -189,7 +191,8 @@ export const renderPagesSequentially = async (
             });
 
             if (url) {
-                onPageRendered(i, url);
+                results.set(i, url);
+                if (onPageRendered) onPageRendered(i, url);
             }
 
             // Cleanup canvas memory immediately to help garbage collector
@@ -206,4 +209,6 @@ export const renderPagesSequentially = async (
 
     // Destroy the main pdf document object to free memory
     await pdf.destroy();
+    
+    return results;
 };
